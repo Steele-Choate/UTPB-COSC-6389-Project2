@@ -361,8 +361,8 @@ class UI(tk.Tk):
         tk.OptionMenu(control_frame, self.activation_var, "Sigmoid", "Tanh", "ReLU").pack(pady=5)
 
         # Buttons for training and testing
-        tk.Button(control_frame, text="Train w/ Dataset", command=self.train_dataset).pack(pady=5)
         tk.Button(control_frame, text="Train w/ Random Data", command=self.train_random_data).pack(pady=5)
+        tk.Button(control_frame, text="Train w/ Dataset", command=self.train_dataset).pack(pady=5)
         tk.Button(control_frame, text="Test Network", command=self.test_network).pack(pady=5)
 
         # Output display
@@ -434,6 +434,45 @@ class UI(tk.Tk):
         self.ax.autoscale_view()
         self.canvas_plot.draw()
 
+    # Runs a training thread for random data
+    def train_random_data(self):
+        if not self.network:
+            print("Please generate a network first.")
+            return
+
+        if not self.dataset.dataset_loaded:
+            print("No dataset loaded. Please load a dataset first.")
+            return
+
+        try:
+            dataset_size = len(self.dataset.x)
+            training_size = int(0.2 * dataset_size)  # 20% for training
+            num_features = self.dataset.input_size
+            num_classes = self.dataset.output_size
+
+            features = [[random.uniform(0, 1) for _ in range(num_features)] for _ in range(training_size)]
+            labels = [random.randint(0, num_classes - 1) for _ in range(training_size)]
+            one_hot_labels = [[1 if i == label else 0 for i in range(num_classes)] for label in labels]
+            features = normalize_data(features)
+
+            self.training_data = list(zip(features, one_hot_labels))
+            self.testing_data = []
+
+            learning_rate = float(self.lr_entry.get())
+            epochs = int(self.epochs_entry.get())
+
+            self.network.set_activation_function(self.activation_var.get())
+            self.training_thread = threading.Thread(
+                target=self.run_training_thread,
+                args=(epochs, learning_rate)
+            )
+            self.training_thread.daemon = True
+            self.training_thread.start()
+            self.after(100, self.run_nn)  # noqa: specific-warning-code
+
+        except Exception as e:
+            print(f"Error during training with random data: {e}")
+
     # Trains the network with the loaded dataset
     def train_dataset(self):
         self.load_data()
@@ -476,45 +515,6 @@ class UI(tk.Tk):
 
         except Exception as e:
             print(f"Error during training with dataset: {e}")
-
-    # Runs a training thread for random data
-    def train_random_data(self):
-        if not self.network:
-            print("Please generate a network first.")
-            return
-
-        if not self.dataset.dataset_loaded:
-            print("No dataset loaded. Please load a dataset first.")
-            return
-
-        try:
-            dataset_size = len(self.dataset.x)
-            training_size = int(0.2 * dataset_size)  # 20% for training
-            num_features = self.dataset.input_size
-            num_classes = self.dataset.output_size
-
-            features = [[random.uniform(0, 1) for _ in range(num_features)] for _ in range(training_size)]
-            labels = [random.randint(0, num_classes - 1) for _ in range(training_size)]
-            one_hot_labels = [[1 if i == label else 0 for i in range(num_classes)] for label in labels]
-            features = normalize_data(features)
-
-            self.training_data = list(zip(features, one_hot_labels))
-            self.testing_data = []
-
-            learning_rate = float(self.lr_entry.get())
-            epochs = int(self.epochs_entry.get())
-
-            self.network.set_activation_function(self.activation_var.get())
-            self.training_thread = threading.Thread(
-                target=self.run_training_thread,
-                args=(epochs, learning_rate)
-            )
-            self.training_thread.daemon = True
-            self.training_thread.start()
-            self.after(100, self.run_nn)  # noqa: specific-warning-code
-
-        except Exception as e:
-            print(f"Error during training with random data: {e}")
 
     # Tests the network using a portion of the dataset
     def test_network(self):
